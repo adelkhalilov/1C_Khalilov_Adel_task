@@ -33,7 +33,7 @@ struct Subway {
         set<pair<T, int>> g;
         d[start] = {start_time, 0};
         g.insert({start_time, start});
-        while (true) {
+        while(!g.empty()) {
             auto it = g.begin();
             int v = it->second;
             g.erase(it);
