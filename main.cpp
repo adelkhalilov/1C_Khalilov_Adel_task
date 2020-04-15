@@ -11,54 +11,54 @@ struct Subway {
         if (paths.size() != lengths.size() || paths.size() != time.size())
             throw new runtime_error("paths, lengths, time sizes must be equal");
         n = n_;
-        p = paths;
-        q = time;
-        d.resize(n);
-        pt.resize(n, {});
-        e.resize(paths.size(), {});
+        path = paths;
+        times = time;
+        dist.resize(n);
+        path_list.resize(n, {});
+        edges.resize(paths.size(), {});
         for (int i = 0; i < (int)paths.size(); i++) {
             for (int j = 0; j < (int) paths[i].size(); j++)
-                pt[paths[i][j]].emplace_back(i, j);
-            e[i].push_back(0);
+                path_list[paths[i][j]].emplace_back(i, j);
+            edges[i].push_back(0);
             if (paths[i].size() != lengths[i].size() + 1)
                 throw new runtime_error(to_string(i + 1) + "-th path's number of stations differs from number of edges");
             for (int j = 0; j < (int) lengths[i].size(); j++) {
-                e[i].push_back(e[i][j] + lengths[i][j]);
+                edges[i].push_back(edges[i][j] + lengths[i][j]);
             }
         }
     }
 
     pair<T, int> get(int start, int finish, T start_time) {
-        fill(d.begin(), d.end(), make_pair(INF, 0));
-        set<pair<T, int>> g;
-        d[start] = {start_time, 0};
-        g.insert({start_time, start});
-        while(!g.empty()) {
-            auto it = g.begin();
+        fill(dist.begin(), dist.end(), make_pair(INF, 0));
+        set<pair<T, int>> dijkstra_set;
+        dist[start] = {start_time, 0};
+        dijkstra_set.insert({start_time, start});
+        while (!dijkstra_set.empty()) {
+            auto it = dijkstra_set.begin();
             int v = it->second;
-            g.erase(it);
+            dijkstra_set.erase(it);
             if (v == finish) {
                 break;
             }
             auto update = [&](int i, pair<T, int> nw) {
-                if (d[i] > nw) {
-                    g.erase({d[i].first, i});
-                    d[i] = nw;
-                    g.insert({d[i].first, i});
+                if (dist[i] > nw) {
+                    dijkstra_set.erase({dist[i].first, i});
+                    dist[i] = nw;
+                    dijkstra_set.insert({dist[i].first, i});
                 }
             };
-            for (auto [id, i] : pt[v]) {
-                T w = wait(d[v].first, id, i, 0);
-                for (int j = i + 1; j < (int)p[id].size(); j++)
-                    update(p[id][j], make_pair(d[v].first + w + e[id][j] - e[id][i], d[v].second + 1));
-                w = wait(d[v].first, id, i, 1);
+            for (auto [id, i] : path_list[v]) {
+                T w = wait(dist[v].first, id, i, 0);
+                for (int j = i + 1; j < (int)path[id].size(); j++)
+                    update(path[id][j], make_pair(dist[v].first + w + edges[id][j] - edges[id][i], dist[v].second + 1));
+                w = wait(dist[v].first, id, i, 1);
                 for (int j = i - 1; j >= 0; j--)
-                    update(p[id][j], make_pair(d[v].first + w - e[id][j] + e[id][i], d[v].second + 1));
+                    update(path[id][j], make_pair(dist[v].first + w - edges[id][j] + edges[id][i], dist[v].second + 1));
             }
         }
-        if (d[finish].first == INF)
-            d[finish].first = -1;
-        return d[finish];
+        if (dist[finish].first == INF)
+            dist[finish].first = -1;
+        return dist[finish];
     }
 
     pair<T, int> get_lazy(int start, int finish, T start_time) {
@@ -69,22 +69,22 @@ struct Subway {
         ds.resize(bound + 1, vector<T>(n, INF));
         ds[0][start] = start_time;
         for (int it = 0; it < bound; it++) {
-            for (int i = 0; i < (int)p.size(); i++) {
+            for (int i = 0; i < (int)path.size(); i++) {
                 T val = INF;
-                for (int j = 0; j < (int)p[i].size(); j++) {
+                for (int j = 0; j < (int)path[i].size(); j++) {
                     if (val != INF)
-                        ds[it + 1][p[i][j]] = min(ds[it + 1][p[i][j]], val + e[i][j]);
-                    T &o = ds[it][p[i][j]];
+                        ds[it + 1][path[i][j]] = min(ds[it + 1][path[i][j]], val + edges[i][j]);
+                    T &o = ds[it][path[i][j]];
                     if (o != INF)
-                        val = min(val, o + wait(o, i, j, 0) - e[i][j]);
+                        val = min(val, o + wait(o, i, j, 0) - edges[i][j]);
                 }
                 val = INF;
-                for (int j = (int)p[i].size() - 1; j >= 0; j--) {
+                for (int j = (int)path[i].size() - 1; j >= 0; j--) {
                     if (val != INF)
-                        ds[it + 1][p[i][j]] = min(ds[it + 1][p[i][j]], val - e[i][j]);
-                    T &o = ds[it][p[i][j]];
+                        ds[it + 1][path[i][j]] = min(ds[it + 1][path[i][j]], val - edges[i][j]);
+                    T &o = ds[it][path[i][j]];
                     if (o != INF)
-                        val = min(val, o + wait(o, i, j, 1) + e[i][j]);
+                        val = min(val, o + wait(o, i, j, 1) + edges[i][j]);
                 }
             }
         }
@@ -97,21 +97,21 @@ struct Subway {
 private:
 
     T wait(T w, int id, int i, bool rev) {
-        T rem = (w % q[id]);
-        T cur_rem = (rev ? (e[id].back() - e[id][i]) : e[id][i] % q[id]);
+        T rem = (w % times[id]);
+        T cur_rem = (rev ? (edges[id].back() - edges[id][i]) : edges[id][i] % times[id]);
         if (cur_rem >= rem)
             cur_rem = cur_rem - rem;
         else
-            cur_rem = q[id] - rem + cur_rem;
+            cur_rem = times[id] - rem + cur_rem;
         return cur_rem;
     }
 
     int n;
-    vector<vector<int>> p;
-    vector<vector<T>> e;
-    vector<vector<pair<int, int>>> pt;
-    vector<T> q;
-    vector<pair<T, int>> d;
+    vector<vector<int>> path;
+    vector<vector<T>> edges;
+    vector<vector<pair<int, int>>> path_list;
+    vector<T> times;
+    vector<pair<T, int>> dist;
     vector<vector<T>> ds;
     const T INF = numeric_limits<T>::max();
 };
